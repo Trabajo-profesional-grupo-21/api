@@ -1,0 +1,8 @@
+pika
+ujson
+opencv-python
+fastapi
+uvicorn
+pydantic-settings
+python-jose
+passlib

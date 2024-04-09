@@ -1,0 +1,19 @@
+version: "3"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api
+    environment:
+    - PYTHONUNBUFFERED=1
+    - ID=api
+    ports:
+      - "8000:8000"
+    networks:
+      - custom_network
+
+networks:
+  custom_network:
+    external: true
