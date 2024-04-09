@@ -6,7 +6,14 @@
 
 ## Uso
 
-Si no tenemos una instancia de RabbitMQ corriendo, debemos levantar una en nuestro local.
+### Ejecutar RabbitMQ
+
+Si no tenemos una instancia de RabbitMQ corriendo, debemos levantar una en nuestro local
+
+Para levantar el contenedor de rabbit hay dos opciones:
+
+- Clonar el repositorio: [rabbitmq](https://github.com/Trabajo-profesional-grupo-21/rabbitmq) y seguir los pasos del README para ejecutarla usando `docker-compose`
+- Seguir los siguientes pasos: ⬇️⬇️⬇️
 
 Primero creamos una network de docker:
 
@@ -34,9 +41,15 @@ docker container stop rabbitmq
 
 
 
+### Ejecutar API
+
 Ahora podemos usar el `docker-compose.yaml` para ejecutar la api:
 
 ```bash
-docker compose up api --build
+docker compose up --build
 ```
 
+Para remover el contenedor:
+```bash
+docker compose down
+```
