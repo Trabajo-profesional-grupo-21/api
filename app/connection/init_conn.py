@@ -1,4 +1,4 @@
-from .Connection import Connection
+from common.connection import Connection
 
 def init_conn():
     connection = Connection()

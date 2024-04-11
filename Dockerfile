@@ -1,6 +1,7 @@
 FROM python:3.9.7-slim
 
 RUN apt-get update && apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev libgl1-mesa-glx
+RUN apt-get install -y git
 
 # TODO: usar requirements file 
 RUN pip install --upgrade pip
@@ -13,6 +14,8 @@ RUN pip3 install pydantic-settings
 RUN pip3 install python-jose
 RUN pip3 install passlib
 RUN pip3 install websockets
+
+RUN pip3 install git+https://github.com/Trabajo-profesional-grupo-21/common.git@0.0.1#egg=common
 
 COPY / /
 
