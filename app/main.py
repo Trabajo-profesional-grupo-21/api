@@ -117,17 +117,4 @@ frame a la queue.
 '''
 @app.get("/")
 async def root():
-    cap = cv2.VideoCapture('./app/test.mp4')
-
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        frame_data = cv2.imencode('.jpg', frame)[1].tobytes()
-        output_queue.send(frame_data)
-    return {"msg": "TPP Grupo 21"}
+    return {"msg": "TPP Grupo 21 - API"}
