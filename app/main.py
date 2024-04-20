@@ -98,7 +98,8 @@ async def entire_video(websocket: WebSocket):
     batches_sent = send_frames(video_data)
     start_processing = time.time()
     
-    await asyncio.create_task(receive_and_send_from_queue(websocket, batches_sent))
+    # await asyncio.create_task(receive_and_send_from_queue(websocket, batches_sent))
+    receive_and_send_from_queue(websocket, batches_sent)
 
     end_time = time.time()
     total_time = end_time - start_time
