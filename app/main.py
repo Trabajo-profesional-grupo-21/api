@@ -12,7 +12,7 @@ app = FastAPI()
 
 connection, output_queue, input_queue = init_conn()
 
-BUNCH_FRAMES = 10
+BUNCH_FRAMES = 5
 
 '''
 Recibe un video entero, lo guarda como un tempfile, y luego 
@@ -39,7 +39,7 @@ def send_frames(video_data):
     while True:
         there_is_frame, frame = cap.read()
         if there_is_frame:
-            frame_data = cv2.imencode('.jpg', frame)[1].tolist()
+            frame_data = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])[1].tolist()
             current_bunch[str(frame_id)] = frame_data
             frame_id += 1
         if len(current_bunch) == BUNCH_FRAMES or not there_is_frame:
@@ -98,8 +98,7 @@ async def entire_video(websocket: WebSocket):
     batches_sent = send_frames(video_data)
     start_processing = time.time()
     
-    # await asyncio.create_task(receive_and_send_from_queue(websocket, batches_sent))
-    receive_and_send_from_queue(websocket, batches_sent)
+    await asyncio.create_task(receive_and_send_from_queue(websocket, batches_sent))
 
     end_time = time.time()
     total_time = end_time - start_time
