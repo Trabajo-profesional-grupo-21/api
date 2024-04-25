@@ -12,7 +12,7 @@ app = FastAPI()
 
 connection, output_queue, input_queue = init_conn()
 
-BUNCH_FRAMES = 10
+BUNCH_FRAMES = 5
 
 '''
 Recibe un video entero, lo guarda como un tempfile, y luego 
@@ -39,7 +39,7 @@ def send_frames(video_data):
     while True:
         there_is_frame, frame = cap.read()
         if there_is_frame:
-            frame_data = cv2.imencode('.jpg', frame)[1].tolist()
+            frame_data = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])[1].tolist()
             current_bunch[str(frame_id)] = frame_data
             frame_id += 1
         if len(current_bunch) == BUNCH_FRAMES or not there_is_frame:
@@ -117,17 +117,4 @@ frame a la queue.
 '''
 @app.get("/")
 async def root():
-    cap = cv2.VideoCapture('./app/test.mp4')
-
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        frame_data = cv2.imencode('.jpg', frame)[1].tobytes()
-        output_queue.send(frame_data)
-    return {"msg": "TPP Grupo 21"}
+    return {"msg": "TPP Grupo 21 - API"}
