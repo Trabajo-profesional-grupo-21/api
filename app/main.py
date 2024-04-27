@@ -12,7 +12,7 @@ app = FastAPI()
 
 connection, output_queue, input_queue = init_conn()
 
-BUNCH_FRAMES = 5
+BUNCH_FRAMES = 10
 
 '''
 Recibe un video entero, lo guarda como un tempfile, y luego 
@@ -47,6 +47,7 @@ def send_frames(video_data):
             data_send = {"user_id": user_id, "batch": current_bunch, "batch_id": str(batches_sent)}
             output_queue.send(json.dumps(data_send))
             current_bunch = {}
+            frame_id = 0
 
         if not there_is_frame:
             break
