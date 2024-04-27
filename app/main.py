@@ -55,6 +55,18 @@ def send_frames(video_data):
 
     return batches_sent
 
+async def calculate_video_frame_rate(websocket, video_data):
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        tmp_file.write(video_data)
+        video_path = tmp_file.name
+
+    cap = cv2.VideoCapture(video_path)
+
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    logging.info(f"FPS VIDEO #{fps}")
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    return frame_count, fps
+
 
 async def receive_and_send_from_queue(websocket, batches_sent):
     batches_received = 0
@@ -107,6 +119,16 @@ async def entire_video(websocket: WebSocket):
     receive_time = start_sending - start_time
     end_message = {"total_time": total_time, "send_time": send_time, "process_time": process_time, "receive_time": receive_time, "batches": batches_sent}
     
+    await websocket.send_json(end_message)
+    await websocket.close()
+
+
+@app.websocket("/video_info")
+async def video_data(websocket: WebSocket):
+    await websocket.accept()
+    video_data = await websocket.receive_bytes()
+    frame_count, fps = await calculate_video_frame_rate(websocket, video_data)
+    end_message = {"frame_count": frame_count, "fps": fps}
     await websocket.send_json(end_message)
     await websocket.close()
 
