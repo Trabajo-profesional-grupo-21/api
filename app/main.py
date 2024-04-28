@@ -51,7 +51,8 @@ def send_frames(video_data):
 
         if not there_is_frame:
             break
-
+    
+    output_queue.send(json.dumps({"EOF": user_id, "total": batches_sent}))
     tmp_file.close()
 
     return batches_sent
