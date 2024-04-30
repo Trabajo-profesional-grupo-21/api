@@ -1,4 +1,21 @@
 from common.connection import Connection
+import os
+from dotenv import load_dotenv
+import aiormq
+
+load_dotenv()
+
+async def init_async_conn():
+    connection = await aiormq.connect("amqp://guest:guest@rabbitmq:5672")
+    channel = await connection.channel()
+
+    await channel.exchange_declare(
+        "frames",
+        exchange_type="fanout"
+    )
+
+    return channel
+
 
 def init_conn():
     connection = Connection(host='moose.rmq.cloudamqp.com', port=5672,
