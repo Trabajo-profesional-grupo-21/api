@@ -17,7 +17,7 @@ app = FastAPI()
 
 connection, output_queue, input_queue = init_conn()
 
-BUNCH_FRAMES = 5
+BUNCH_FRAMES = 10
 
 '''
 Recibe un video entero, lo guarda como un tempfile, y luego 
@@ -36,7 +36,7 @@ def send_frames(video_data):
     user_id = "test"
 
     current_bunch = {}
-    batches_sent = 0
+    batches_sent = -1
     # agregamos informacion para que cuando se tengan que ordenar los frames dentro del batch 
     # (como antes era una sola cola, no hacia falta. Pero ahora hay que mergear los resultados de
     # valencia y arousal)
@@ -52,10 +52,11 @@ def send_frames(video_data):
             data_send = {"user_id": user_id, "batch": current_bunch, "batch_id": str(batches_sent)}
             output_queue.send(json.dumps(data_send))
             current_bunch = {}
-
+            frame_id = 0
         if not there_is_frame:
             break
-
+        
+    output_queue.send(json.dumps({"EOF": user_id, "total": batches_sent}))
     tmp_file.close()
 
     return batches_sent
@@ -116,24 +117,20 @@ async def entire_video(websocket: WebSocket):
     await websocket.close()
 
 
-async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int, user_id: str):
-    # cap = cv2.VideoCapture(video_path)
-
-    # fps = int(cap.get(cv2.CAP_PROP_FPS))
-    # frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
+async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int, user_id: str):    
     frame_number = 0
     frames_to_process = 0
     frames = []
 
     current_batch = {}
-    batches_sent = 0
+    batches_sent = -1
 
     # user_id = f"user_id_{time.time()}"
 
     while frame_number <= frame_count:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number-1)
         res, frame = cap.read()
+        # cv2.imwrite(f"frame_{frame_number}.jpg", frame)
 
         # frames.append(frame)
         frame_data = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])[1].tolist()
@@ -150,7 +147,6 @@ async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int,
             )
             current_batch = {}
 
-        # cv2.imwrite(f"frame_{frame_number}.jpg", frame)
         frame_number += fps
         frames_to_process += 1
     
@@ -161,6 +157,12 @@ async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int,
         # output_queue.send(json.dumps(data_send))
         await app.state.amqp_channel.basic_publish(
                 body=json.dumps(data_send).encode('utf-8'),
+                exchange="frames",
+                routing_key=""
+        )
+
+    await app.state.amqp_channel.basic_publish(
+                body=json.dumps({"EOF": user_id, "total": batches_sent}).encode('utf-8'),
                 exchange="frames",
                 routing_key=""
         )
@@ -195,8 +197,7 @@ async def upload_video(file: UploadFile = File(...)):
     }
 
 @app.get("/batch_data/{user_id}/{batch_id}")
-async def upload_video(user_id: str, batch_id: int):
-
+async def get_batch(user_id: str, batch_id: int):
     try:
         data = app.state.redis.get(f'{user_id}-{batch_id}')
         return {
@@ -207,6 +208,29 @@ async def upload_video(user_id: str, batch_id: int):
     except Exception:
         return {"msg": "not ready"}
 
+
+@app.get("/batch_data_time/{user_id}/{video_time}")
+async def get_batch_from_time(user_id: str, video_time: int):
+
+    try:
+        batch_id = video_time // BUNCH_FRAMES
+        video_pos = video_time % BUNCH_FRAMES
+        data = app.state.redis.get(f'{user_id}-{batch_id}')
+        return {
+            "user_id": user_id,
+            "batch": batch_id, 
+            "video_pos": video_pos,
+            "data": data
+        }
+    except Exception:
+        return {"msg": "not ready"}
+
+
+@app.get("/video/{video_id}")
+async def get_video(user_id: str, video_id: str):
+
+    
+    pass
 
 '''
 Sirve para pruebas, abre un video y lo envia frame por
