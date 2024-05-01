@@ -74,6 +74,7 @@ async def receive_and_send_from_queue(websocket, batches_sent):
         data = json.loads(body.decode())
         batches_received += 1
         # Enviar el mensaje recibido del RabbitMQ al WebSocket
+        logging.info(f"MANDO DATA AL FRONT")
         await websocket.send_json(data)
         if batches_received == batches_sent:
             break
