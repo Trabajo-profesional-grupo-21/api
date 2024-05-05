@@ -10,10 +10,18 @@ import time
 import shutil
 import math
 import redis
+from fastapi.middleware.cors import CORSMiddleware
 
 from .connection.init_conn import init_conn, init_async_conn
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 connection, output_queue, input_queue = init_conn()
 
