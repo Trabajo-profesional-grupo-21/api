@@ -177,7 +177,7 @@ async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int,
 
 @app.post("/upload/")
 async def upload_video(file: UploadFile = File(...)):
-
+    logging.info("Received request to upload file")
     with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
         shutil.copyfileobj(file.file, tmp_file)
         video_path = tmp_file.name
@@ -186,6 +186,7 @@ async def upload_video(file: UploadFile = File(...)):
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     user_id = f"user_id_{time.time()}"
+    logging.info(f"Processing frames for {user_id}")
 
     frames_to_process = math.ceil(frame_count/fps)
     total_batches = math.ceil(frames_to_process/BUNCH_FRAMES)
@@ -199,7 +200,7 @@ async def upload_video(file: UploadFile = File(...)):
         "user_id": user_id,
         "filename": file.filename, 
         "total_frames": frame_count, 
-        "fps":fps, 
+        "fps": fps, 
         "frames_to_process": frames_to_process,
         "total_batches": total_batches
     }
