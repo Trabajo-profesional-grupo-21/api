@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket
 from fastapi import File, UploadFile, Response
 from fastapi.responses import FileResponse, StreamingResponse
+import os
 import cv2
 import logging
 import tempfile
@@ -11,6 +12,7 @@ import shutil
 import math
 import redis
 from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
 
 from .connection.init_conn import init_conn, init_async_conn
 
@@ -174,6 +176,42 @@ async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int,
                 exchange="frames",
                 routing_key=""
         )
+
+
+@app.post("/upload/photo/")
+async def upload_photo(file: UploadFile = File(...)):
+    
+    user_id = f"user_id_{time.time()}"
+    image_data = os.path.splitext(file.filename)
+    image_name = image_data[0]
+    if len(image_data[1]) == 0:
+        extension = ".jpg"
+    else:
+        extension = "." + image_data[1]
+
+    file_content = await file.read()
+    nparr = np.frombuffer(file_content, np.uint8)
+    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    frame_data = cv2.imencode(extension, image, [cv2.IMWRITE_JPEG_QUALITY, 50])[1].tolist()
+    batch = {"0": frame_data}
+    data_send = {"user_id": user_id, "img_name": image_name, "img": batch}
+    await app.state.amqp_channel.basic_publish(
+            body=json.dumps(data_send).encode('utf-8'),
+            exchange="frames",
+            routing_key=""
+    )
+
+    key, data = app.state.redis.blpop(f'{user_id}-{image_name}', timeout=60)
+    if data is None:
+        return {"error": "Error Creating Message"}
+    else:
+        return {
+            "user_id": user_id,
+            "img_name": image_name,
+            "data": json.loads(data)["batch"]
+        }
+
 
 @app.post("/upload/")
 async def upload_video(file: UploadFile = File(...)):
