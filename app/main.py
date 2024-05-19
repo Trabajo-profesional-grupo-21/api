@@ -1,6 +1,6 @@
 from fastapi import FastAPI, WebSocket
-from fastapi import File, UploadFile, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import File, UploadFile, Response, HTTPException
+from fastapi.responses import JSONResponse
 import os
 import cv2
 import logging
@@ -14,9 +14,19 @@ import redis
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 
+from google.auth.credentials import Credentials
+from google.cloud import storage
+
+# from gcloud.aio.auth import IapToken
+from gcloud.aio.storage import Storage, Bucket, Blob
+# from gcloud.aio.bucket import Bucket
+# from gcloud.aio.blob import Blob
+
+
 from .connection.init_conn import init_conn, init_async_conn
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,9 +35,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-connection, output_queue, input_queue = init_conn()
+# connection, output_queue, input_queue = init_conn()
 
-BUNCH_FRAMES = 10
+BUNCH_FRAMES = 5
 
 
 async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int, user_id: str):    
@@ -60,7 +70,8 @@ async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int,
             )
             current_batch = {}
 
-        frame_number += fps
+        # frame_number += fps
+        frame_number += 1
         frames_to_process += 1
     
     # Frames que quedaron sin eviar
@@ -79,6 +90,11 @@ async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int,
                 exchange="frames",
                 routing_key=""
         )
+
+async def upload_file_to_gcs(file: UploadFile, user_id: str) -> None:
+    file_content = await file.read()
+    filename_in_bucket = f"{user_id}/{file.filename}"
+    await app.state.storage_client.upload("tpp_videos", filename_in_bucket, file_content)
 
 
 @app.post("/upload/photo/")
@@ -116,8 +132,49 @@ async def upload_photo(file: UploadFile = File(...)):
         }
 
 
+@app.get("/video_url/{user_id}/{filename}")
+async def get_url(user_id: str, filename: str):
+
+    try:
+        filename_in_bucket = f"{user_id}/{filename}"
+
+        bucket = Bucket(app.state.storage_client, "tpp_videos")
+        blob = await bucket.get_blob(filename_in_bucket)
+        signed_url = await blob.get_signed_url(
+                expiration=3600,
+            )
+        return JSONResponse(content={'url': signed_url}, status_code=200)
+    
+    except Exception as err:
+        raise HTTPException(status_code=404, detail={
+                'message': 'Video not found: '+str(err)})
+
 @app.post("/upload/")
-async def upload_video(file: UploadFile = File(...)):
+async def upload_video(user_id: str, file: UploadFile = File(...)):
+
+    # CRUD -> Chequeo si user existe y si no lo creo
+    # CRUD -> Chequeo que ese user no tenga ese video ya subido
+
+    """
+
+        {
+            user_id: str, # Si usamos autenticacion con email puede ser el email
+            videos: [
+                {
+                    name: str,
+                    data: {}
+                }
+            ],
+            images: [
+                {
+                    name: str,
+                    data: {}
+                }
+            ]
+
+        }
+    
+    """
 
     with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
         shutil.copyfileobj(file.file, tmp_file)
@@ -126,12 +183,12 @@ async def upload_video(file: UploadFile = File(...)):
     cap = cv2.VideoCapture(video_path)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    user_id = f"user_id_{time.time()}"
 
     frames_to_process = math.ceil(frame_count/fps)
     total_batches = math.ceil(frames_to_process/BUNCH_FRAMES)
 
-    processing_task = asyncio.create_task(process_file_upload(cap, fps, frame_count, user_id))
+    asyncio.create_task(process_file_upload(cap, fps, frame_count, user_id))
+    asyncio.create_task(upload_file_to_gcs(file, user_id))
 
     # Sleep de 10 seg ~ la duracion de 2 batches
     await asyncio.sleep(10)
@@ -175,13 +232,6 @@ async def get_batch_from_time(user_id: str, video_time: int):
         return {"msg": "not ready"}
 
 
-@app.get("/video/{video_id}")
-async def get_video(user_id: str, video_id: str):
-
-    
-    pass
-
-
 @app.get("/")
 async def root():
     return {"msg": "TPP Grupo 21 - API"}
@@ -190,8 +240,9 @@ async def root():
 @app.on_event("startup")
 async def startup_event():
     app.state.redis = redis.Redis(
-            host='redis-10756.c14.us-east-1-2.ec2.redns.redis-cloud.com',
+            host=os.getenv('REDIS_HOST'),
             port=10756,
-            password='ZpAbSOT5O38zckuiQKsYLrgwzu0g1mMF'
+            password=os.getenv('REDIS_PASSWORD')
         )
     app.state.amqp_channel = await init_async_conn()
+    app.state.storage_client = Storage()

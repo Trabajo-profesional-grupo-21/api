@@ -18,6 +18,10 @@ RUN pip3 install python-dotenv
 RUN pip3 install python-multipart
 RUN pip3 install aiormq
 RUN pip3 install redis
+RUN pip3 install gcloud-aio-storage
+# RUN pip3 install gcloud.aio.auth
+RUN pip3 install google-cloud-storage
+RUN pip3 install google-auth
 
 RUN pip3 install git+https://github.com/Trabajo-profesional-grupo-21/common.git@0.0.3#egg=common
 
