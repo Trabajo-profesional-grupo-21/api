@@ -1,4 +1,4 @@
-FROM python:3.9.7-slim
+FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev libgl1-mesa-glx
 RUN apt-get install -y git
@@ -19,9 +19,7 @@ RUN pip3 install python-multipart
 RUN pip3 install aiormq
 RUN pip3 install redis
 RUN pip3 install gcloud-aio-storage
-# RUN pip3 install gcloud.aio.auth
-RUN pip3 install google-cloud-storage
-RUN pip3 install google-auth
+RUN pip3 install motor
 
 RUN pip3 install git+https://github.com/Trabajo-profesional-grupo-21/common.git@0.0.3#egg=common
 
