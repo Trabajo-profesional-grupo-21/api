@@ -1,6 +1,7 @@
 from fastapi import Request, status, Response
 from fastapi.responses import JSONResponse
 from ..exceptions.user_exceptions import UserAlreadyExists, UserNotFound
+from ..exceptions.data_exceptions import BlobAlreadyExists, VideoDataNotReady, BlobNotFound, ImageDataError
 from ..exceptions.auth_exceptions import InvalidCredentials, NotEnoughPrivileges
 from ..exceptions.commons import InvalidParameter
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -19,6 +20,18 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
 
         except UserAlreadyExists as e:
             return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(e)})
+
+        except BlobAlreadyExists as e:
+            return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(e)})
+
+        except ImageDataError as e:
+            return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"detail": str(e)})
+
+        except VideoDataNotReady as e:
+            return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"detail": str(e)})
+
+        except BlobNotFound as e:
+            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(e)})
 
         except InvalidParameter as e:
             return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": str(e)})
