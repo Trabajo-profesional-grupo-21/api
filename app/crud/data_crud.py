@@ -2,8 +2,6 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from ..exceptions.commons import DbError
 
 
-""""""
-
 async def create(db: AsyncIOMotorDatabase, user_id: str, file_name: str, extra_data = {}, type: str = 'video'):
     try:
 
@@ -25,6 +23,15 @@ async def find(db: AsyncIOMotorDatabase, user_id: str, file_name: str):
     try:
         result = await db["data"].find_one({"user_id": user_id, "file_name": file_name})
 
+        return result
+    except Exception as e:
+        raise DbError(message=e)
+
+
+async def find_all_data(db: AsyncIOMotorDatabase, user_id: str, file_type: str):
+    try:
+        cursor = db["data"].find({"user_id": user_id, "type": file_type})
+        result = await cursor.to_list(None)
         return result
     except Exception as e:
         raise DbError(message=e)
