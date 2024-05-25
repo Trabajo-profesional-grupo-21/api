@@ -52,6 +52,23 @@ async def upload_image(
         redis
     )
 
+@router.post("/stimulus", status_code=status.HTTP_201_CREATED)
+async def upload_stimulus(
+        match_file_name: str,
+        file: UploadFile = File(...),
+        current_user = Depends(get_current_user),
+        gcs = Depends(get_gcs),
+        db = Depends(get_db)
+    ):
+
+    return await DataService.upload_stimulus(
+        current_user["email"], 
+        file.filename,
+        file.file,
+        match_file_name,
+        gcs,
+        db,
+    )
 
 @router.get("/video/batch_id/{video_name}/{batch_id}", status_code=status.HTTP_200_OK)
 async def get_batch_from_id(
@@ -105,3 +122,21 @@ async def get_images(
         db = Depends(get_db),
     ):
     return await DataService.get_file_name_list(current_user['email'], 'image', db)
+
+@router.delete("/video/{video_name}", status_code=status.HTTP_200_OK)
+async def delete_video_data(
+        video_name: str,
+        current_user = Depends(get_current_user),
+        gcs = Depends(get_gcs),
+        db = Depends(get_db),
+    ):
+    return await DataService.delete_blob(current_user['email'], video_name, gcs, db)
+
+@router.delete("/image/{image_name}", status_code=status.HTTP_200_OK)
+async def delete_image_data(
+        image_name: str,
+        current_user = Depends(get_current_user),
+        gcs = Depends(get_gcs),
+        db = Depends(get_db),
+    ):
+    return await DataService.delete_blob(current_user['email'], image_name, gcs, db)

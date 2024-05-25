@@ -14,7 +14,7 @@ import mimetypes
 import datetime
 import base64
 
-BUNCH_FRAMES = 5
+BUNCH_FRAMES = 10
 
 
 class DataService:
@@ -120,7 +120,7 @@ class DataService:
             }
             # raise BlobAlreadyExists()
 
-        
+
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             shutil.copyfileobj(file_content, tmp_file)
             video_path = tmp_file.name
@@ -222,6 +222,44 @@ class DataService:
                     "data": json.loads(data)["batch"]
                 }
 
+    @classmethod
+    async def upload_stimulus(
+        self,
+        user_id,
+        file_name,
+        file_content,
+        match_file,
+        gcs,
+        db
+    ):
+        matchname_in_bucket = f'{user_id}-{match_file}'
+        match_file = await data_crud.find(db, user_id, matchname_in_bucket)
+
+        if match_file is None:
+            raise BlobNotFound("Match File Not Found")
+
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            shutil.copyfileobj(file_content, tmp_file)
+            video_path = tmp_file.name
+
+        cap = cv2.VideoCapture(video_path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        res, frame = cap.read()
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame_data_base64 = base64.b64encode(buffer).decode()
+        thumbnail = 'data:image/jpg;base64,' + frame_data_base64
+
+        filename_in_bucket = f'{user_id}-{file_name}'
+        bucket = gcs.bucket("tpp_videos")
+        blob = bucket.blob(filename_in_bucket)
+        if not blob.exists():
+            upload_gcs_task = asyncio.create_task(self.upload_file_to_gcs(video_path, filename_in_bucket))        
+            cleanup_task = asyncio.create_task(self.cleanup_tasks(video_path, upload_gcs_task))
+        else:
+            cleanup_task = asyncio.create_task(self.cleanup_tasks(video_path))
+        
+        await data_crud.assign_stimulus(db, user_id, matchname_in_bucket, filename_in_bucket, thumbnail)
+
     @staticmethod
     async def get_batch(user_id: str, video_name: str, batch_id:int, redis, db):
         file_name = f'{user_id}-{video_name}'
@@ -269,26 +307,55 @@ class DataService:
     async def get_blob(self, user_id: str, file_name: str, gcs, db):
         try:
             filename_in_bucket = f"{user_id}-{file_name}"
+ 
+            data = await data_crud.find(db, user_id, filename_in_bucket)
+            if data is None:
+                raise Exception("Missing Batch")
+            extra_data = data["extra_data"]            
+
             bucket = gcs.bucket("tpp_videos")
             blob = bucket.blob(filename_in_bucket)
-
             signed_url = blob.generate_signed_url(
                 version="v4",
                 expiration=datetime.timedelta(minutes=240),
                 method="GET",
             )
- 
-            data = await data_crud.find(db, user_id, filename_in_bucket)
-            if data is None:
-                raise Exception("Missing Batch")
-            extra_data = data["extra_data"]
+
+            if data["stimulus"]:
+                blob = bucket.blob(data['stimulus'])
+                stimulus_signed_url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=datetime.timedelta(minutes=240),
+                    method="GET",
+                )
+            else:
+                stimulus_signed_url = None
+            
             data = data["data"]
 
             return {
                 "url": signed_url,
+                "stimulus_url": stimulus_signed_url,
                 "data": data,
                 **extra_data
             }
+        except Exception:
+            raise BlobNotFound()
+    
+    @classmethod
+    async def delete_blob(self, user_id: str, file_name: str, gcs, db):
+        try:
+            data = await data_crud.delete(db, user_id, filename_in_bucket)
+            if data is None:
+                raise Exception("Video Not Found")
+
+            filename_in_bucket = f"{user_id}-{file_name}"
+            bucket = gcs.bucket("tpp_videos")
+            blob = bucket.blob(filename_in_bucket) #DELETE
+            if blob.exists():
+                blob.delete()
+            else:
+                raise Exception("Video Not Found")
         except Exception:
             raise BlobNotFound()
 
