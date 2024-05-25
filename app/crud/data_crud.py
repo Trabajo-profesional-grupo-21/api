@@ -2,13 +2,14 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from ..exceptions.commons import DbError
 
 
-async def create(db: AsyncIOMotorDatabase, user_id: str, file_name: str, extra_data = {}, type: str = 'video'):
+async def create(db: AsyncIOMotorDatabase, user_id: str, file_name: str, img: str, extra_data = {}, type: str = 'video'):
     try:
 
         data = {
             "user_id": user_id,
             "type": type,
             "file_name": file_name,
+            "thumbnail": img,
             "extra_data": extra_data,
             "data": {}
         }

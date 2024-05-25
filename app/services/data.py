@@ -12,6 +12,7 @@ from aiogoogle import Aiogoogle
 from ..config.gcs import creds
 import mimetypes
 import datetime
+import base64
 
 BUNCH_FRAMES = 5
 
@@ -89,6 +90,13 @@ class DataService:
                     routing_key=""
             )
 
+    @staticmethod
+    async def create_with_thumbnail(cap: cv2.VideoCapture, user_id: str, filename_in_bucket, extra_data, db):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        res, frame = cap.read()
+        _, buffer = cv2.imencode('.jpg', frame,)
+        frame_data_base64 = base64.b64encode(buffer).decode()
+        await data_crud.create(db, user_id, filename_in_bucket, f'data:image/jpg;base64,{frame_data_base64}', extra_data=extra_data)
 
     @classmethod
     async def upload_video(
@@ -106,7 +114,9 @@ class DataService:
         if video_exists:
             return {
                 "msg": "Video already exists",
-                **video_exists['extra_data']
+                **video_exists['extra_data'],
+                "user_id": video_exists['user_id'],
+                "filename": file_name,
             }
             # raise BlobAlreadyExists()
 
@@ -129,7 +139,8 @@ class DataService:
             "total_batches": total_batches
         }
 
-        await data_crud.create(db, user_id, filename_in_bucket, extra_data=extra_data)
+        # await data_crud.create(db, user_id, filename_in_bucket, extra_data=extra_data)
+        await self.create_with_thumbnail(cap, user_id, filename_in_bucket, extra_data, db)
         processing_task = asyncio.create_task(self.process_file_upload(cap, fps, frame_count, user_id, file_name, True, rabbit))
         upload_gcs_task = asyncio.create_task(self.upload_file_to_gcs(video_path, filename_in_bucket))
         cleanup_task = asyncio.create_task(self.cleanup_tasks(video_path, processing_task, upload_gcs_task))
@@ -168,7 +179,7 @@ class DataService:
                 }
             # raise BlobAlreadyExists()
 
-        await data_crud.create(db, user_id, filename_in_bucket, {}, 'image')
+        # await data_crud.create(db, user_id, filename_in_bucket, {}, 'image')
 
         with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
             shutil.copyfileobj(file_content, tmp_file)
@@ -178,19 +189,23 @@ class DataService:
 
             image_data = os.path.splitext(file_name)
             image_name = image_data[0]
-            if len(image_data[1]) == 0:
-                extension = ".jpg"
-            else:
-                extension = "." + image_data[1]
+            # if len(image_data[1]) == 0:
+            extension = ".jpg"
+            # else:
+            #     extension = "." + image_data[1]
 
             tmp_file.seek(0)
             file_content = tmp_file.read()
             nparr = np.frombuffer(file_content, np.uint8)
             image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            frame_data = cv2.imencode(extension, image, [cv2.IMWRITE_JPEG_QUALITY, 50])[1].tolist()
+            _, buffer = cv2.imencode(extension, image, [cv2.IMWRITE_JPEG_QUALITY, 50])
+
+            frame_data = buffer.tolist()
+            frame_data_base64 = base64.b64encode(buffer).decode()
+            await data_crud.create(db, user_id, filename_in_bucket, f'data:image/jpg;base64,{frame_data_base64}', {}, 'image')
+
             batch = {"0": frame_data}
             data_send = {"user_id": user_id, "img_name": image_name, "img": batch, "file_name": file_name, "upload": True}
-
             await rabbit.basic_publish(
                     body=json.dumps(data_send).encode('utf-8'),
                     exchange="frames",
@@ -284,16 +299,21 @@ class DataService:
         """
         try:
             results = await data_crud.find_all_data(db, user_id, type)
-            names = []
+            files = []
 
             for result in results:
                 name = result['file_name'].replace(f"{user_id}-", '')
-                names.append(name)
+                files.append(
+                    {
+                        "name": name,
+                        "thumbnail": result['thumbnail']
+                    }
+                )
 
             return {
                 "user_id": user_id,
-                "file_name": names,
-                "number_of_files": len(names)
+                "files": files,
+                "number_of_files": len(files)
             }
         except Exception as e:
             raise e
