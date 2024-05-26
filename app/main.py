@@ -12,6 +12,7 @@ from .routers import auth, data, users
 app = FastAPI()
 
 app.add_middleware(ErrorHandlerMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
