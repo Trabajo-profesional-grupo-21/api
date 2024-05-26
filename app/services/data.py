@@ -264,8 +264,11 @@ class DataService:
     async def get_batch(user_id: str, video_name: str, batch_id:int, redis, db):
         file_name = f'{user_id}-{video_name}'
         data = redis.get(f'{file_name}-{batch_id}')
+        
+        if data:
+            return json.loads(data.decode())['batch']
 
-        if data is None:
+        if data is None: # TTL de redis vencio, vamos a mongo
             data = await data_crud.find(db, user_id, file_name)
             if data is None:
                 raise Exception("Missing Batch")
