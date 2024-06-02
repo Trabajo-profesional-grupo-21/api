@@ -25,7 +25,7 @@ RUN pip3 install aiohttp
 RUN pip3 install aiogoogle
 RUN pip3 install google-cloud-storage
 
-RUN pip3 install git+https://github.com/Trabajo-profesional-grupo-21/common.git@0.0.3#egg=common
+RUN pip3 install git+https://github.com/Trabajo-profesional-grupo-21/common.git@0.0.6#egg=common
 
 COPY / /
 
