@@ -31,14 +31,3 @@ async def get_current_user(db: AsyncIOMotorDatabase = Depends(get_db), token: st
     if not user:
         raise UserNotFound()
     return user
-
-# # def get_current_user_or_admin(wallet_id: str, current_user: User = Depends(get_current_user)):
-# #     if crud.user.is_admin(current_user) or current_user.wallet_id == wallet_id:
-# #         return current_user
-# #     else:
-# #         raise NotEnoughPrivileges()
-
-# # def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
-# #     if not crud.user.is_admin(current_user):
-# #         raise NotEnoughPrivileges()
-# #     return current_user

@@ -70,7 +70,6 @@ class DataService:
                 current_batch = {}
 
             frame_number += fps
-            # frame_number += 1
             frames_to_process += 1
         
         # Frames que quedaron sin eviar
