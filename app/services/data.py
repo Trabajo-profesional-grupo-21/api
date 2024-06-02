@@ -61,12 +61,7 @@ class DataService:
             if len(current_batch) == BUNCH_FRAMES:
                 batches_sent += 1
                 data_send = {"user_id": user_id, "batch": current_batch, "batch_id": str(batches_sent), "file_name": file_name, "upload": upload}
-                
-                await rabbit.basic_publish(
-                    body=json.dumps(data_send).encode('utf-8'),
-                    exchange="frames",
-                    routing_key=""
-                )
+                await rabbit.send(json.dumps(data_send).encode('utf-8'))
                 current_batch = {}
 
             frame_number += fps
@@ -76,18 +71,9 @@ class DataService:
         if len(current_batch) > 0:
             batches_sent += 1
             data_send = {"user_id": user_id, "batch": current_batch, "batch_id": str(batches_sent), "file_name": file_name, "upload": upload}
-            # output_queue.send(json.dumps(data_send))
-            await rabbit.basic_publish(
-                    body=json.dumps(data_send).encode('utf-8'),
-                    exchange="frames",
-                    routing_key=""
-            )
+            await rabbit.send(json.dumps(data_send).encode('utf-8'))
 
-        await rabbit.basic_publish(
-                    body=json.dumps({"EOF": user_id, "total": batches_sent}).encode('utf-8'),
-                    exchange="frames",
-                    routing_key=""
-            )
+        await rabbit.send(json.dumps({"EOF": user_id, "total": batches_sent}).encode('utf-8'))
 
     @staticmethod
     async def create_with_thumbnail(cap: cv2.VideoCapture, user_id: str, filename_in_bucket, extra_data, db):
@@ -178,8 +164,6 @@ class DataService:
                 }
             # raise BlobAlreadyExists()
 
-        # await data_crud.create(db, user_id, filename_in_bucket, {}, 'image')
-
         with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
             shutil.copyfileobj(file_content, tmp_file)
             img_path = tmp_file.name
@@ -188,10 +172,7 @@ class DataService:
 
             image_data = os.path.splitext(file_name)
             image_name = image_data[0]
-            # if len(image_data[1]) == 0:
             extension = ".jpg"
-            # else:
-            #     extension = "." + image_data[1]
 
             tmp_file.seek(0)
             file_content = tmp_file.read()
@@ -205,11 +186,7 @@ class DataService:
 
             batch = {"0": frame_data}
             data_send = {"user_id": user_id, "img_name": image_name, "img": batch, "file_name": file_name, "upload": True}
-            await rabbit.basic_publish(
-                    body=json.dumps(data_send).encode('utf-8'),
-                    exchange="frames",
-                    routing_key=""
-            )
+            await rabbit.send(json.dumps(data_send).encode('utf-8'))
 
             key, data = redis.blpop(f'{user_id}-{image_name}', timeout=120)
             if data is None:
