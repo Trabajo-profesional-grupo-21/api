@@ -13,6 +13,8 @@ async def create(db: AsyncIOMotorDatabase, user_id: str, file_name: str, thumbna
             "extra_data": extra_data,
             "stimulus": None,
             "stimulus_thumbnail": None,
+            "stimulus_arousal": None,
+            "stimulus_valence": None,
             "data": {}
         }
 
@@ -46,11 +48,16 @@ async def delete(db: AsyncIOMotorDatabase, user_id: str, file_name: str):
     except Exception as e:
         raise DbError(message=e)
 
-async def assign_stimulus(db: AsyncIOMotorDatabase, user_id: str, file_name: str, stimulus_name: str, stimulus_thumbnail: str):
+async def assign_stimulus(db: AsyncIOMotorDatabase, user_id: str, file_name: str, stimulus_name: str, stimulus_thumbnail: str, expected_values: dict):
     try:
 
         data = db["data"].find_one_and_update({"user_id": user_id, "file_name": file_name}, 
-                                                    {"$set": {"stimulus": stimulus_name, "stimulus_thumbnail": stimulus_thumbnail}}, return_document=True)
+                                                    {"$set": {
+                                                        "stimulus": stimulus_name, 
+                                                        "stimulus_thumbnail": stimulus_thumbnail,
+                                                        "stimulus_arousal": expected_values['arousal'],
+                                                        "stimulus_valence": expected_values['valence'],
+                                                    }}, return_document=True)
         if data is None:
             raise Exception("File Not Found")
 

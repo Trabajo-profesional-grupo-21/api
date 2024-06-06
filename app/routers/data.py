@@ -52,20 +52,28 @@ async def upload_image(
         redis
     )
 
-@router.post("/stimulus", status_code=status.HTTP_201_CREATED)
+@router.post("/stimulus/", status_code=status.HTTP_201_CREATED)
 async def upload_stimulus(
         match_file_name: str,
+        arousal: float | None = None,
+        valence: float | None = None,
         file: UploadFile = File(...),
         current_user = Depends(get_current_user),
         gcs = Depends(get_gcs),
         db = Depends(get_db)
     ):
 
+    expected_values = {
+        'valence': valence,
+        'arousal': arousal,
+    }
+
     return await DataService.upload_stimulus(
         current_user["email"], 
         file.filename,
         file.file,
         match_file_name,
+        expected_values,
         gcs,
         db,
     )

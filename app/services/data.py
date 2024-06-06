@@ -205,6 +205,7 @@ class DataService:
         file_name,
         file_content,
         match_file,
+        expected_values,
         gcs,
         db
     ):
@@ -234,7 +235,7 @@ class DataService:
         else:
             cleanup_task = asyncio.create_task(self.cleanup_tasks(video_path))
         
-        await data_crud.assign_stimulus(db, user_id, matchname_in_bucket, filename_in_bucket, thumbnail)
+        await data_crud.assign_stimulus(db, user_id, matchname_in_bucket, filename_in_bucket, thumbnail, expected_values)
 
     @staticmethod
     async def get_batch(user_id: str, video_name: str, batch_id:int, redis, db):
@@ -309,12 +310,17 @@ class DataService:
                 )
             else:
                 stimulus_signed_url = None
+
+            stimulus_arousal = data['stimulus_arousal']
+            stimulus_valence = data['stimulus_valence']
             
             data = data["data"]
 
             return {
                 "url": signed_url,
                 "stimulus_url": stimulus_signed_url,
+                "stimulus_arousal": stimulus_arousal,
+                "stimulus_valence": stimulus_valence,
                 "data": data,
                 **extra_data
             }
