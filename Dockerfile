@@ -18,7 +18,7 @@ RUN pip3 install python-dotenv
 RUN pip3 install python-multipart
 RUN pip3 install aiormq
 RUN pip3 install redis
-# RUN pip3 install gcloud-aio-storage
+RUN pip3 install gcloud-aio-storage
 RUN pip3 install motor
 # RUN pip3 install aiofiles
 RUN pip3 install aiohttp

@@ -13,6 +13,9 @@ from ..config.gcs import creds
 import mimetypes
 import datetime
 import base64
+from gcloud.aio.storage import Storage, Bucket, Blob
+import aiohttp
+import aiofiles
 
 BUNCH_FRAMES = 10
 
@@ -32,16 +35,30 @@ class DataService:
 
     @staticmethod
     async def upload_file_to_gcs(file_path:str, filename_in_bucket: str) -> None:
-        
-        async with Aiogoogle(service_account_creds=creds) as aiogoogle:
-            storage = await aiogoogle.discover("storage", "v1")
-            req = storage.objects.insert(
-                bucket="tpp_videos",
-                name=filename_in_bucket,
-                upload_file=file_path,
-            )
-            req.upload_file_content_type = DataService.detect_content_type(filename_in_bucket)
-            await aiogoogle.as_service_account(req)
+        # async with aiohttp.ClientSession() as session:
+        client = Storage()
+
+        async with aiofiles.open(file_path, mode="rb") as f:
+            output = await f.read()
+            await client.upload(
+                'tpp_videos',
+                filename_in_bucket,
+                output,
+                force_resumable_upload=True,
+                timeout=None
+            )   
+        # async with Aiogoogle(service_account_creds=creds) as aiogoogle:
+        #     storage = await aiogoogle.discover("storage", "v1")
+        #     # print(json.dumps(storage.discovery_document))
+        #     # storage.discovery_document['baseUrl'] = "https://localhost:4443/storage/v1/"
+        #     # storage.discovery_document['rootUrl'] = "https://localhost:4443/"
+        #     req = storage.objects.insert(
+        #         bucket="tpp_videos",
+        #         name=filename_in_bucket,
+        #         upload_file=file_path,
+        #     )
+        #     req.upload_file_content_type = DataService.detect_content_type(filename_in_bucket)
+        #     await aiogoogle.as_service_account(req)
     
     @staticmethod
     async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int, user_id: str, file_name: str, upload: bool, rabbit):    
@@ -292,6 +309,18 @@ class DataService:
                 raise Exception("Missing Batch")
             extra_data = data["extra_data"]            
 
+
+            # client = Storage()
+            # blob = await Bucket(client, 'tpp_videos').get_blob(filename_in_bucket)
+
+            # signed_url = await blob.get_signed_url(expiration=240)
+
+            # if data["stimulus"]:
+            #     blob = await Bucket(client, 'tpp_videos').get_blob(data['stimulus'])
+            #     stimulus_signed_url = await blob.get_signed_url(expiration=240)
+            # else:
+            #     stimulus_signed_url = None
+            
             bucket = gcs.bucket("tpp_videos")
             blob = bucket.blob(filename_in_bucket)
             signed_url = blob.generate_signed_url(
@@ -309,7 +338,7 @@ class DataService:
                 )
             else:
                 stimulus_signed_url = None
-            
+        
             data = data["data"]
 
             return {

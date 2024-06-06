@@ -20,6 +20,7 @@ async def connect_to_rabbit():
 
     await connection.connect()
     rabbit.output_queue = await connection.Publisher("frames", "fanout")
+    print(f"Connection: {rabbit.output_queue}")
 
     print("Connected to RabbitMQ")
 
