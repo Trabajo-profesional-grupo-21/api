@@ -9,7 +9,6 @@ services:
     environment:
     - PYTHONUNBUFFERED=1
     - ID=api
-    - STORAGE_EMULATOR_HOST=http://localhost:4443
     ports:
       - "8000:8000"
     networks:

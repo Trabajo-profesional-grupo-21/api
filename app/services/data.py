@@ -17,8 +17,25 @@ from gcloud.aio.storage import Storage, Bucket, Blob
 import aiohttp
 import aiofiles
 
+import aioboto3
+from botocore.config import Config
+from boto3.s3.transfer import TransferConfig
+import aiobotocore
+from aiobotocore.session import get_session
+from aiobotocore.config import AioConfig
+from aiohttp import ClientSession
+
+from botocore.client import Config
+
+
 BUNCH_FRAMES = 10
 
+AWS_S3_HOST = 'http://minio:9000'
+AWS_SECRET_ACCESS_KEY = 'minioadmin'
+AWS_ACCESS_KEY_ID = 'minioadmin'
+AWS_MULTIPART_BYTES_PER_CHUNK = 1024 * 1024 * 5  # ~ 5mb
+AWS_S3_BUCKET_NAME = 'test-bucket'
+EXPIRATION_DAYS = 1
 
 class DataService:
 
@@ -35,18 +52,76 @@ class DataService:
 
     @staticmethod
     async def upload_file_to_gcs(file_path:str, filename_in_bucket: str) -> None:
-        # async with aiohttp.ClientSession() as session:
-        client = Storage()
 
-        async with aiofiles.open(file_path, mode="rb") as f:
-            output = await f.read()
-            await client.upload(
-                'tpp_videos',
-                filename_in_bucket,
-                output,
-                force_resumable_upload=True,
-                timeout=None
-            )   
+        session = aioboto3.Session()
+        async with session.client(
+            "s3",
+            endpoint_url=AWS_S3_HOST,
+            aws_access_key_id='minioadmin',
+            aws_secret_access_key='minioadmin',
+            region_name='us-east-1',
+            config=Config(
+                s3={"addressing_style": "virtual"},  # "path" will become deprecated
+                signature_version="s3v4",  # for minio
+            ),
+            use_ssl=False
+        ) as client:
+            response = await client.list_buckets()
+            print(response)
+            # async with aiofiles.open(file_path, 'rb') as file:
+            #     await client.upload_fileobj(
+            #         Fileobj=file,
+            #         Bucket='tpp-videos',
+            #         Key=filename_in_bucket,
+            #         # Config=transfer_config
+            #     )
+
+        # async with aioboto3.Session(
+        #     aws_access_key_id='minioadmin',
+        #     aws_secret_access_key='minioadmin',
+        #     region_name='us-east-1',
+        #     aws_session_token=None,
+        #     botocore_session=None,
+        #     profile_name=None,
+        # ) as s3_client:
+
+        #     transfer_config = aioboto3.s3.transfer.TransferConfig(
+        #         multipart_threshold=1024*25,  # 25 MB
+        #         max_concurrency=4,
+        #         multipart_chunksize=1024*25,  # 25 MB
+        #         use_threads=True
+        #     )
+        #     async with s3_client.client('s3') as s3:
+        #         async with aiofiles.open(file_path, 'rb') as file:
+        #             await s3.upload_fileobj(
+        #                 Fileobj=await file.read(),
+        #                 Bucket='tpp-videos',
+        #                 Key=filename_in_bucket,
+        #                 Config=transfer_config
+        #             )
+        # session = aioboto3.Session(
+        #     aws_access_key_id='minioadmin',
+        #     aws_secret_access_key='minioadmin',
+        #     region_name='us-east-1',
+        #     aws_session_token=None,
+        #     botocore_session=None,
+        #     profile_name=None
+        # )
+        # async with session.client('s3') as s3_client:
+
+        #     transfer_config = TransferConfig(
+        #         multipart_threshold=1024*25,  # 25 MB
+        #         max_concurrency=4,
+        #         multipart_chunksize=1024*25,  # 25 MB
+        #         use_threads=True
+        #     )
+        #     with open(file_path, 'rb') as file:
+        #         await s3_client.upload_fileobj(
+        #             Fileobj=file,
+        #             Bucket='tpp-videos',
+        #             Key=filename_in_bucket,
+        #             Config=transfer_config
+        #         )
         # async with Aiogoogle(service_account_creds=creds) as aiogoogle:
         #     storage = await aiogoogle.discover("storage", "v1")
         #     # print(json.dumps(storage.discovery_document))
