@@ -1,4 +1,5 @@
 from ..crud import data_crud
+from ..config.config import settings
 from ..exceptions.data_exceptions import BlobAlreadyExists, VideoDataNotReady, BlobNotFound, ImageDataError
 import json
 import cv2
@@ -8,34 +9,19 @@ import shutil
 import os
 import math
 import numpy as np
-from aiogoogle import Aiogoogle
-from ..config.gcs import creds
 import mimetypes
 import datetime
 import base64
 from gcloud.aio.storage import Storage, Bucket, Blob
 import aiohttp
-import aiofiles
 
-import aioboto3
-from botocore.config import Config
-from boto3.s3.transfer import TransferConfig
-import aiobotocore
-from aiobotocore.session import get_session
-from aiobotocore.config import AioConfig
-from aiohttp import ClientSession
 
-from botocore.client import Config
+# from aiogoogle import Aiogoogle
+# from ..config.gcs import creds
+# import aiofiles
 
 
 BUNCH_FRAMES = 10
-
-AWS_S3_HOST = 'http://minio:9000'
-AWS_SECRET_ACCESS_KEY = 'minioadmin'
-AWS_ACCESS_KEY_ID = 'minioadmin'
-AWS_MULTIPART_BYTES_PER_CHUNK = 1024 * 1024 * 5  # ~ 5mb
-AWS_S3_BUCKET_NAME = 'test-bucket'
-EXPIRATION_DAYS = 1
 
 class DataService:
 
@@ -52,16 +38,20 @@ class DataService:
 
     @staticmethod
     async def upload_file_to_gcs(file_path:str, filename_in_bucket: str) -> None:
-        async with aiohttp.ClientSession(
-            connector=aiohttp.TCPConnector(ssl=None)
-        ) as session:
+        try:
+            async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(ssl=settings.USE_SSL)
+            ) as session:
 
-            client = Storage(session=session)
-            await client.upload_from_filename(
-                    'tpp_videos',
+                client = Storage(session=session)
+                await client.upload_from_filename(
+                    settings.BUCKET_NAME,
                     filename_in_bucket,
-                    file_path
+                    file_path,
+                    timeout = None
                 )
+        except Exception as e:
+            raise Exception(f"Error uploading file to object storage: {e}")
     
     @staticmethod
     async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int, user_id: str, file_name: str, upload: bool, rabbit):    
@@ -123,7 +113,6 @@ class DataService:
                 "user_id": video_exists['user_id'],
                 "filename": file_name,
             }
-            # raise BlobAlreadyExists()
 
 
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
@@ -182,7 +171,6 @@ class DataService:
                     "img_name": file_name,
                     "data": image_exists["data"]
                 }
-            # raise BlobAlreadyExists()
 
         with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
             shutil.copyfileobj(file_content, tmp_file)
@@ -218,6 +206,19 @@ class DataService:
                     "data": json.loads(data)["batch"]
                 }
 
+    @staticmethod
+    async def blob_exists(filename):
+        try:
+            async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(ssl=settings.USE_SSL)
+            ) as session:
+
+                client = Storage(session=session)
+                bucket = Bucket(client, settings.BUCKET_NAME)
+                return await bucket.blob_exists(filename)
+        except Exception as e:
+            raise Exception(f"Error checking file in object storage: {e}")
+
     @classmethod
     async def upload_stimulus(
         self,
@@ -225,7 +226,6 @@ class DataService:
         file_name,
         file_content,
         match_file,
-        gcs,
         db
     ):
         matchname_in_bucket = f'{user_id}-{match_file}'
@@ -246,9 +246,9 @@ class DataService:
         thumbnail = 'data:image/jpg;base64,' + frame_data_base64
 
         filename_in_bucket = f'{user_id}-{file_name}'
-        bucket = gcs.bucket("tpp_videos")
-        blob = bucket.blob(filename_in_bucket)
-        if not blob.exists():
+        # bucket = gcs.bucket(settings.BUCKET_NAME)
+        # blob = bucket.blob(filename_in_bucket)
+        if not await self.blob_exists(filename_in_bucket):
             upload_gcs_task = asyncio.create_task(self.upload_file_to_gcs(video_path, filename_in_bucket))        
             cleanup_task = asyncio.create_task(self.cleanup_tasks(video_path, upload_gcs_task))
         else:
@@ -302,45 +302,74 @@ class DataService:
         except Exception:
             raise VideoDataNotReady(message=f'Batch {batch_id} calculation in progress ')
 
+    @staticmethod
+    async def sign_file(filename_in_bucket, stimulus = None):
+        stimulus_signed_url = None
+        if settings.USING_EMULATOR:
+            url = settings.GCP_EMULATOR_URL.replace('gcs', 'localhost')
+            signed_url = f'{url}/{settings.BUCKET_NAME}/{filename_in_bucket}'
+            if stimulus:
+                stimulus_signed_url = f'{url}/{settings.BUCKET_NAME}/{stimulus}'
+
+            return signed_url, stimulus_signed_url
+        
+        try:
+            async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(ssl=settings.USE_SSL)
+            ) as session:
+
+                client = Storage(session=session)
+                bucket = Bucket(client, settings.BUCKET_NAME)
+                blob = await bucket.get_blob(filename_in_bucket)
+                signed_url = await blob.get_signed_url(expiration=240)
+
+                if stimulus:
+                    blob = await bucket.get_blob(stimulus)
+                    stimulus_signed_url = await blob.get_signed_url(expiration=240)
+
+                return signed_url, stimulus_signed_url
+        except Exception as e:
+            raise Exception(f"Error signing file in object storage: {e}")
+
+
     @classmethod
-    async def get_blob(self, user_id: str, file_name: str, gcs, db):
+    async def get_blob(self, user_id: str, file_name: str, db):
         try:
             filename_in_bucket = f"{user_id}-{file_name}"
  
             data = await data_crud.find(db, user_id, filename_in_bucket)
             if data is None:
                 raise Exception("Missing Batch")
-            extra_data = data["extra_data"]            
+            extra_data = data["extra_data"]  
 
+            signed_url, stimulus_signed_url = await self.sign_file(filename_in_bucket, data.get("stimulus"))
 
             # client = Storage()
-            # blob = await Bucket(client, 'tpp_videos').get_blob(filename_in_bucket)
+            # blob = Bucket(client, 'tpp_videos').get_blob(filename_in_bucket)
 
             # signed_url = await blob.get_signed_url(expiration=240)
 
             # if data["stimulus"]:
-            #     blob = await Bucket(client, 'tpp_videos').get_blob(data['stimulus'])
+            #     blob = Bucket(client, 'tpp_videos').get_blob(data['stimulus'])
             #     stimulus_signed_url = await blob.get_signed_url(expiration=240)
             # else:
             #     stimulus_signed_url = None
-            
-            bucket = gcs.bucket("tpp_videos")
-            blob = bucket.blob(filename_in_bucket)
-            signed_url = blob.generate_signed_url(
-                version="v4",
-                expiration=datetime.timedelta(minutes=240),
-                method="GET",
-            )
 
-            if data["stimulus"]:
-                blob = bucket.blob(data['stimulus'])
-                stimulus_signed_url = blob.generate_signed_url(
-                    version="v4",
-                    expiration=datetime.timedelta(minutes=240),
-                    method="GET",
-                )
-            else:
-                stimulus_signed_url = None
+                # bucket = gcs.bucket(settings.BUCKET_NAME)
+                # blob = bucket.blob(filename_in_bucket)
+                # signed_url = blob.generate_signed_url(
+                #     version="v4",
+                #     expiration=datetime.timedelta(minutes=240),
+                #     method="GET",
+                # )
+
+                # if data["stimulus"]:
+                #     blob = bucket.blob(data['stimulus'])
+                #     stimulus_signed_url = blob.generate_signed_url(
+                #         version="v4",
+                #         expiration=datetime.timedelta(minutes=240),
+                #         method="GET",
+                #     )
         
             data = data["data"]
 
@@ -354,19 +383,25 @@ class DataService:
             raise BlobNotFound()
     
     @classmethod
-    async def delete_blob(self, user_id: str, file_name: str, gcs, db):
+    async def delete_blob(self, user_id: str, file_name: str, db):
         try:
             data = await data_crud.delete(db, user_id, filename_in_bucket)
             if data is None:
                 raise Exception("Video Not Found")
 
             filename_in_bucket = f"{user_id}-{file_name}"
-            bucket = gcs.bucket("tpp_videos")
-            blob = bucket.blob(filename_in_bucket) #DELETE
-            if blob.exists():
-                blob.delete()
-            else:
-                raise Exception("Video Not Found")
+
+            async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(ssl=settings.USE_SSL)
+            ) as session:
+                client = Storage(session=session)
+                bucket = Bucket(client, settings.BUCKET_NAME)
+                exists = await bucket.blob_exists(filename_in_bucket)
+
+                if not exists:
+                    raise Exception("Video Not Found")
+
+                await client.delete(settings.BUCKET_NAME, filename_in_bucket)
         except Exception:
             raise BlobNotFound()
 

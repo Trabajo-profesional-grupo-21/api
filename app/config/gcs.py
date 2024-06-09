@@ -5,31 +5,10 @@ from .config import settings
 import os
 import json
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.GOOGLE_APPLICATION_CREDENTIALS
-
-service_account_key = json.load(open(settings.GOOGLE_APPLICATION_CREDENTIALS))
-
-creds = ServiceAccountCreds(
-    scopes=[
-        "https://www.googleapis.com/auth/devstorage.read_only",
-        "https://www.googleapis.com/auth/devstorage.read_write",
-        "https://www.googleapis.com/auth/devstorage.full_control",
-        "https://www.googleapis.com/auth/cloud-platform.read-only",
-        "https://www.googleapis.com/auth/cloud-platform",
-    ],
-    **service_account_key
-)
-
-class GCS:
-    storage_client = None
-
-gcs = GCS()
-
 async def connect_to_gcs():
-    gcs.storage_client = storage.Client()
-    print("Connected to GCS")
-
-async def get_gcs():
-    if gcs.storage_client is None:
-        await connect_to_gcs()
-    return gcs.storage_client
+    if settings.GOOGLE_APPLICATION_CREDENTIALS is not None:
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.GOOGLE_APPLICATION_CREDENTIALS
+        settings.USING_EMULATOR = False
+        settings.USE_SSL = True
+    else:
+        os.environ["STORAGE_EMULATOR_HOST"] = settings.GCP_EMULATOR_URL
