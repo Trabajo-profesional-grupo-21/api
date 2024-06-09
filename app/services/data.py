@@ -343,33 +343,6 @@ class DataService:
             extra_data = data["extra_data"]  
 
             signed_url, stimulus_signed_url = await self.sign_file(filename_in_bucket, data.get("stimulus"))
-
-            # client = Storage()
-            # blob = Bucket(client, 'tpp_videos').get_blob(filename_in_bucket)
-
-            # signed_url = await blob.get_signed_url(expiration=240)
-
-            # if data["stimulus"]:
-            #     blob = Bucket(client, 'tpp_videos').get_blob(data['stimulus'])
-            #     stimulus_signed_url = await blob.get_signed_url(expiration=240)
-            # else:
-            #     stimulus_signed_url = None
-
-                # bucket = gcs.bucket(settings.BUCKET_NAME)
-                # blob = bucket.blob(filename_in_bucket)
-                # signed_url = blob.generate_signed_url(
-                #     version="v4",
-                #     expiration=datetime.timedelta(minutes=240),
-                #     method="GET",
-                # )
-
-                # if data["stimulus"]:
-                #     blob = bucket.blob(data['stimulus'])
-                #     stimulus_signed_url = blob.generate_signed_url(
-                #         version="v4",
-                #         expiration=datetime.timedelta(minutes=240),
-                #         method="GET",
-                #     )
         
             data = data["data"]
 
