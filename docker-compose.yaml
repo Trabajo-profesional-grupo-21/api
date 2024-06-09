@@ -9,6 +9,7 @@ services:
     environment:
     - PYTHONUNBUFFERED=1
     - ID=api
+    - STORAGE_EMULATOR_HOST=http://gcs:8001
     ports:
       - "8000:8000"
     networks:

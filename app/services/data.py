@@ -52,88 +52,16 @@ class DataService:
 
     @staticmethod
     async def upload_file_to_gcs(file_path:str, filename_in_bucket: str) -> None:
+        async with aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(ssl=None)
+        ) as session:
 
-        session = aioboto3.Session()
-        async with session.client(
-            "s3",
-            endpoint_url=AWS_S3_HOST,
-            aws_access_key_id='minioadmin',
-            aws_secret_access_key='minioadmin',
-            region_name='us-east-1',
-            config=Config(
-                s3={"addressing_style": "virtual"},  # "path" will become deprecated
-                signature_version="s3v4",  # for minio
-            ),
-            use_ssl=False
-        ) as client:
-            response = await client.list_buckets()
-            print(response)
-            # async with aiofiles.open(file_path, 'rb') as file:
-            #     await client.upload_fileobj(
-            #         Fileobj=file,
-            #         Bucket='tpp-videos',
-            #         Key=filename_in_bucket,
-            #         # Config=transfer_config
-            #     )
-
-        # async with aioboto3.Session(
-        #     aws_access_key_id='minioadmin',
-        #     aws_secret_access_key='minioadmin',
-        #     region_name='us-east-1',
-        #     aws_session_token=None,
-        #     botocore_session=None,
-        #     profile_name=None,
-        # ) as s3_client:
-
-        #     transfer_config = aioboto3.s3.transfer.TransferConfig(
-        #         multipart_threshold=1024*25,  # 25 MB
-        #         max_concurrency=4,
-        #         multipart_chunksize=1024*25,  # 25 MB
-        #         use_threads=True
-        #     )
-        #     async with s3_client.client('s3') as s3:
-        #         async with aiofiles.open(file_path, 'rb') as file:
-        #             await s3.upload_fileobj(
-        #                 Fileobj=await file.read(),
-        #                 Bucket='tpp-videos',
-        #                 Key=filename_in_bucket,
-        #                 Config=transfer_config
-        #             )
-        # session = aioboto3.Session(
-        #     aws_access_key_id='minioadmin',
-        #     aws_secret_access_key='minioadmin',
-        #     region_name='us-east-1',
-        #     aws_session_token=None,
-        #     botocore_session=None,
-        #     profile_name=None
-        # )
-        # async with session.client('s3') as s3_client:
-
-        #     transfer_config = TransferConfig(
-        #         multipart_threshold=1024*25,  # 25 MB
-        #         max_concurrency=4,
-        #         multipart_chunksize=1024*25,  # 25 MB
-        #         use_threads=True
-        #     )
-        #     with open(file_path, 'rb') as file:
-        #         await s3_client.upload_fileobj(
-        #             Fileobj=file,
-        #             Bucket='tpp-videos',
-        #             Key=filename_in_bucket,
-        #             Config=transfer_config
-        #         )
-        # async with Aiogoogle(service_account_creds=creds) as aiogoogle:
-        #     storage = await aiogoogle.discover("storage", "v1")
-        #     # print(json.dumps(storage.discovery_document))
-        #     # storage.discovery_document['baseUrl'] = "https://localhost:4443/storage/v1/"
-        #     # storage.discovery_document['rootUrl'] = "https://localhost:4443/"
-        #     req = storage.objects.insert(
-        #         bucket="tpp_videos",
-        #         name=filename_in_bucket,
-        #         upload_file=file_path,
-        #     )
-        #     req.upload_file_content_type = DataService.detect_content_type(filename_in_bucket)
-        #     await aiogoogle.as_service_account(req)
+            client = Storage(session=session)
+            await client.upload_from_filename(
+                    'tpp_videos',
+                    filename_in_bucket,
+                    file_path
+                )
     
     @staticmethod
     async def process_file_upload(cap: cv2.VideoCapture, fps: int, frame_count: int, user_id: str, file_name: str, upload: bool, rabbit):    
