@@ -9,7 +9,7 @@ redis_instance = Redis()
 async def connect_to_redis():
     redis_instance.client = redis.Redis(
         host = settings.REDIS_HOST,
-        port = 10756,
+        port = settings.REDIS_PORT,
         password = settings.REDIS_PASSWORD
     )
 

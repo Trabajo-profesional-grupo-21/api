@@ -2,7 +2,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
-    REDIS_HOST: str | None = None
+    REDIS_HOST: str | None = 'redis'
+    REDIS_PORT: int | None = 6379
     REDIS_PASSWORD: str | None = None
 
     MONGODB_URL: str | None = 'mongodb://mongodb:27017'
@@ -18,6 +19,13 @@ class Settings(BaseSettings):
     GCP_EMULATOR_URL: str | None = 'http://gcs:8001'
     USING_EMULATOR: bool | None = True
     USE_SSL: bool | None = None
+
+    REMOTE_RABBIT: bool | None = False
+    RABBIT_HOST: str | None = None
+    RABBIT_PORT: int | None = None
+    RABBIT_VHOST: str | None = None
+    RABBIT_USER: str | None = None
+    RABBIT_PASSWORD: str | None = None
 
     class Config:
         case_sensitive = True

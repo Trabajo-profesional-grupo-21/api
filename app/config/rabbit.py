@@ -1,5 +1,5 @@
 from common.async_connection import AsyncConnection
-import os
+from .config import settings
 
 class Rabbit:
     connection = None
@@ -8,13 +8,13 @@ class Rabbit:
 rabbit = Rabbit()
 
 async def connect_to_rabbit():
-    remote_rabbit = os.getenv('REMOTE_RABBIT', False)
+    remote_rabbit = settings.REMOTE_RABBIT
     if remote_rabbit:
-        connection = AsyncConnection(host=os.getenv('RABBIT_HOST'), 
-                                port=os.getenv('RABBIT_PORT'),
-                                virtual_host=os.getenv('RABBIT_VHOST'), 
-                                user=os.getenv('RABBIT_USER'), 
-                                password=os.getenv('RABBIT_PASSWORD'))
+        connection = AsyncConnection(host=settings.RABBIT_HOST, 
+                                port=settings.RABBIT_PORT,
+                                virtual_host=settings.RABBIT_VHOST, 
+                                user=settings.RABBIT_USER, 
+                                password=settings.RABBIT_PASSWORD)
     else:
         connection = AsyncConnection()
 
