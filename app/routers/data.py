@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, status
 from fastapi import File, UploadFile
-from typing import Any, List
+# from typing import Any, List
 
 
 from ..services.data import DataService
 
-from motor.motor_asyncio import AsyncIOMotorDatabase
+# from motor.motor_asyncio import AsyncIOMotorDatabase
 from ..services.deps import get_current_user
 from ..config.rabbit import get_rabbit
-from ..config.gcs import get_gcs
+# from ..config.gcs import get_gcs
 from ..config.mongo import get_db
 from ..config.redis import get_redis
 
@@ -59,7 +59,6 @@ async def upload_stimulus(
         valence: float | None = None,
         file: UploadFile = File(...),
         current_user = Depends(get_current_user),
-        gcs = Depends(get_gcs),
         db = Depends(get_db)
     ):
 
@@ -74,7 +73,6 @@ async def upload_stimulus(
         file.file,
         match_file_name,
         expected_values,
-        gcs,
         db,
     )
 
@@ -102,19 +100,17 @@ async def get_batch_from_time(
 async def get_video_data(
         video_name: str,
         current_user = Depends(get_current_user),
-        gcs = Depends(get_gcs),
         db = Depends(get_db),
     ):
-    return await DataService.get_blob(current_user['email'], video_name, gcs, db)
+    return await DataService.get_blob(current_user['email'], video_name, db)
 
 @router.get("/image/{image_name}", status_code=status.HTTP_200_OK)
 async def get_image_data(
         image_name: str,
         current_user = Depends(get_current_user),
-        gcs = Depends(get_gcs),
         db = Depends(get_db),
     ):
-    return await DataService.get_blob(current_user['email'], image_name, gcs, db)
+    return await DataService.get_blob(current_user['email'], image_name, db)
 
 @router.get("/videos", status_code=status.HTTP_200_OK)
 async def get_videos(
@@ -135,7 +131,6 @@ async def get_images(
 async def delete_video_data(
         video_name: str,
         current_user = Depends(get_current_user),
-        gcs = Depends(get_gcs),
         db = Depends(get_db),
     ):
     return await DataService.delete_blob(current_user['email'], video_name, gcs, db)
@@ -144,7 +139,6 @@ async def delete_video_data(
 async def delete_image_data(
         image_name: str,
         current_user = Depends(get_current_user),
-        gcs = Depends(get_gcs),
         db = Depends(get_db),
     ):
     return await DataService.delete_blob(current_user['email'], image_name, gcs, db)
