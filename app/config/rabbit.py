@@ -1,3 +1,4 @@
+import asyncio
 from common.async_connection import AsyncConnection
 from .config import settings
 
@@ -7,7 +8,7 @@ class Rabbit:
 
 rabbit = Rabbit()
 
-async def connect_to_rabbit():
+async def connect_to_rabbit(retries=10, delay=5):
     remote_rabbit = settings.REMOTE_RABBIT
     if remote_rabbit:
         connection = AsyncConnection(host=settings.RABBIT_HOST, 
@@ -18,11 +19,22 @@ async def connect_to_rabbit():
     else:
         connection = AsyncConnection()
 
-    await connection.connect()
-    rabbit.output_queue = await connection.Publisher("frames", "fanout")
-    await rabbit.output_queue.init()
+    for attempt in range(retries):
 
-    print("Connected to RabbitMQ")
+        try:
+            await connection.connect()
+            rabbit.output_queue = await connection.Publisher("frames", "fanout")
+            await rabbit.output_queue.init()
+
+            print("Connected to RabbitMQ")
+            break
+
+        except Exception as e:
+            print(f"RabbitMQ connection attempt {attempt + 1} failed: {e}")
+            if attempt < retries - 1:
+                await asyncio.sleep(delay)
+            else:
+                raise e
 
 async def get_rabbit():
     if rabbit.output_queue is None:
