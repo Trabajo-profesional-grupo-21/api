@@ -15,12 +15,6 @@ import base64
 from gcloud.aio.storage import Storage, Bucket, Blob
 import aiohttp
 
-
-# from aiogoogle import Aiogoogle
-# from ..config.gcs import creds
-# import aiofiles
-
-
 BUNCH_FRAMES = 10
 
 class DataService:

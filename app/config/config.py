@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     BUCKET_NAME: str | None = 'tpp_videos'
     GCP_EMULATOR_URL: str | None = 'http://gcs:8001'
     USING_EMULATOR: bool | None = True
-    USE_SSL: bool | None = None
+    USE_SSL: bool | None = False
 
     REMOTE_RABBIT: bool | None = False
     RABBIT_HOST: str | None = None
