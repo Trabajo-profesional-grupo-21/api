@@ -59,6 +59,10 @@ class DataService:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number-1)
             res, frame = cap.read()
 
+            if not res:
+                frame_number += 1
+                continue
+
             frame_data = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])[1].tolist()
             current_batch[str(frame_number)] = frame_data
 
